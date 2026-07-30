@@ -393,9 +393,14 @@ app.get("/api/venda/:id", (req, res) => {
     const venda = vendas.find((v) => v.codigo === id);
 
     if (venda) {
-      // Adicionando um pequeno atraso para simular latência de rede (apenas para desenvolvimento)
+      const vendaComPagamento = {
+        ...venda,
+        pagamento: venda.pagamento || "",
+        pagamentoTipo: venda.pagamentoTipo || "texto",
+      };
+
       setTimeout(() => {
-        res.json(venda);
+        res.json(vendaComPagamento);
       }, 300);
     } else {
       res.status(404).json({

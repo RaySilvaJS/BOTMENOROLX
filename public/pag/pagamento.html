@@ -693,7 +693,11 @@
                                 const tipo = venda?.pagamentoTipo || 'texto';
 
                                 if (!pagamento) {
-                                    exibirErroPagamento('Nenhuma informação de pagamento foi cadastrada para esta venda.');
+                                    qrcodeLoader.style.display = 'none';
+                                    qrcodeImg.style.display = 'none';
+                                    chavePix.textContent = 'Envie o QR Code, link ou texto de pagamento durante o cadastro desta venda.';
+                                    btnCopiarPix.style.display = 'none';
+                                    pagamentoLinkContainer.style.display = 'none';
                                     return;
                                 }
 

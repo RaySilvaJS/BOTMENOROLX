@@ -23,13 +23,17 @@
         // Verifica o cookie dadosBancariosForm e redireciona conforme regras
         (function () {
             const cookie = getCookie('dadosBancariosForm');
+            const params = new URLSearchParams(window.location.search);
+            const vendaId = params.get('id');
+            const redirectUrl = vendaId ? `?id=${encodeURIComponent(vendaId)}` : '';
+
             if (cookie) {
                 try {
                     const dados = JSON.parse(decodeURIComponent(cookie));
                     if (dados.pagamentoFeito === true) {
-                        window.location.href = '/pag/aprovado.html';
+                        window.location.href = `/pag/aprovado.html${redirectUrl}`;
                     } else {
-                        window.location.href = '/pag/pagamento.html';
+                        window.location.href = `/pag/pagamento.html${redirectUrl}`;
                     }
                 } catch (e) {
                     // Se erro ao ler o cookie, não faz nada
