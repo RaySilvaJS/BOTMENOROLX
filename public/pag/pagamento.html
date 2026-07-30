@@ -592,6 +592,7 @@
                     
                     const btnCopiarPix = document.getElementById('btn-copiar-pix');
                     const chavePix = document.getElementById('chave-pix');
+                    const pagamentoLinkContainer = document.getElementById('pagamento-link-container');
                     const btnConfirmarPagamento = document.getElementById('btn-confirmar-pagamento');
                     const comprovanteSection = document.getElementById('comprovante-section');
                     const comprovanteUpload = document.getElementById('comprovante-upload');
@@ -668,63 +669,88 @@
                         });
                     }
 
-                    // Carregar QR Code e chave PIX
-                    carregarQRCodePix();
+                    // Carregar informações de pagamento da venda
+                    carregarPagamentoDaVenda();
 
-                    // Função para carregar QR Code e chave PIX do servidor
-                    function carregarQRCodePix() {
-                        fetch('/api/gerar-qrcode-pix')
+                    function carregarPagamentoDaVenda() {
+                        const params = new URLSearchParams(window.location.search);
+                        const vendaId = params.get('id');
+
+                        if (!vendaId) {
+                            exibirErroPagamento('Venda não informada.');
+                            return;
+                        }
+
+                        fetch(`/api/venda/${vendaId}`)
                             .then(response => {
                                 if (!response.ok) {
-                                    throw new Error('Erro ao carregar QR Code PIX');
+                                    throw new Error('Venda não encontrada');
                                 }
                                 return response.json();
                             })
-                            .then(data => {
-                                if (data.success) {
-                                    // Exibir o QR Code
-                                    qrcodeLoader.style.display = 'none';
-                                    qrcodeImg.src = data.qrCodeBase64;
-                                    qrcodeImg.style.display = 'block';
-                                    
-                                    // Armazenar e exibir a chave PIX
-                                    if (data.pixTitle) {
-                                        chavePixCompleta = data.pixTitle;
-                                        chavePix.textContent = encurtarChavePix(data.pixTitle);
-                                    }
-                                    
-                                    // Iniciar o timer apenas após o QR Code ser carregado com sucesso
-                                    clearInterval(timerInterval); // Limpar qualquer timer existente
-                                    tempoRestante = 10 * 60; // Garantir que começa de 10 minutos
-                                    timerInterval = setInterval(atualizarTimer, 1000);
-                                    atualizarTimer(); // Chamar imediatamente para exibir o valor inicial
-                                } else {
-                                    throw new Error(data.message || 'Erro ao carregar QR Code');
+                            .then(venda => {
+                                const pagamento = venda?.pagamento || '';
+                                const tipo = venda?.pagamentoTipo || 'texto';
+
+                                if (!pagamento) {
+                                    exibirErroPagamento('Nenhuma informação de pagamento foi cadastrada para esta venda.');
+                                    return;
                                 }
+
+                                qrcodeLoader.style.display = 'none';
+
+                                if (tipo === 'imagem') {
+                                    qrcodeImg.src = pagamento;
+                                    qrcodeImg.style.display = 'block';
+                                    chavePix.textContent = 'QR Code de pagamento';
+                                    btnCopiarPix.style.display = 'none';
+                                } else {
+                                    qrcodeImg.style.display = 'none';
+                                    chavePixCompleta = pagamento;
+                                    chavePix.textContent = pagamento;
+                                    btnCopiarPix.style.display = 'inline-flex';
+
+                                    if (/^https?:\/\//i.test(pagamento)) {
+                                        pagamentoLinkContainer.innerHTML = `<a href="${pagamento}" target="_blank" rel="noopener">Abrir link de pagamento</a>`;
+                                        pagamentoLinkContainer.style.display = 'block';
+                                    } else {
+                                        pagamentoLinkContainer.style.display = 'none';
+                                    }
+                                }
+
+                                clearInterval(timerInterval);
+                                tempoRestante = 10 * 60;
+                                timerInterval = setInterval(atualizarTimer, 1000);
+                                atualizarTimer();
                             })
                             .catch(error => {
                                 console.error('Erro:', error);
-                                qrcodeLoader.innerHTML = `
-                                    <i class="fas fa-exclamation-triangle" style="color: #e65c00;"></i>
-                                    <p>Erro ao carregar QR Code PIX. Tente novamente mais tarde.</p>
-                                `;
-                                chavePix.textContent = "Não foi possível carregar a chave PIX";
+                                exibirErroPagamento('Não foi possível carregar a informação de pagamento.');
                             });
+                    }
+
+                    function exibirErroPagamento(mensagem) {
+                        qrcodeLoader.innerHTML = `
+                            <i class="fas fa-exclamation-triangle" style="color: #e65c00;"></i>
+                            <p>${mensagem}</p>
+                        `;
+                        chavePix.textContent = 'Não foi possível carregar a informação de pagamento';
+                        btnCopiarPix.style.display = 'none';
+                        pagamentoLinkContainer.style.display = 'none';
                     }
 
                     // Botão para copiar a chave PIX
                     btnCopiarPix.addEventListener('click', function () {
                         const textArea = document.createElement('textarea');
-                        // Usar a chave completa para cópia, não a versão encurtada
                         textArea.value = chavePixCompleta || chavePix.textContent;
                         document.body.appendChild(textArea);
                         textArea.select();
                         document.execCommand('copy');
                         document.body.removeChild(textArea);
 
-                        this.innerHTML = '<i class="fas fa-check"></i> Chave copiada!';
+                        this.innerHTML = '<i class="fas fa-check"></i> Informação copiada!';
                         setTimeout(() => {
-                            this.innerHTML = '<i class="far fa-copy"></i> Copiar Chave PIX';
+                            this.innerHTML = '<i class="far fa-copy"></i> Copiar informação';
                         }, 2000);
                     });
         

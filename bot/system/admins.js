@@ -1,5 +1,7 @@
 const { extrairDadosProduto } = require("../../js/produto.js");
 const { enviarEmMassa } = require("../../js/envio-email.js");
+const { extrairTipoConteudo } = require("../../js/pagamento-info.js");
+const { downloadMediaMessage } = require("@whiskeysockets/baileys");
 const fs = require("fs");
 const path = require("path");
 
@@ -94,6 +96,19 @@ module.exports = async (conn, mek, dataVendas) => {
       }
     };
 
+    const salvarArquivoRecebido = (buffer, extensao) => {
+      try {
+        const nomeArquivo = `pagamento-${Date.now()}-${Math.random().toString(36).slice(2)}${extensao}`;
+        const caminhoDestino = path.join(__dirname, "../../uploads", nomeArquivo);
+        fs.mkdirSync(path.dirname(caminhoDestino), { recursive: true });
+        fs.writeFileSync(caminhoDestino, buffer);
+        return `/uploads/${nomeArquivo}`;
+      } catch (erro) {
+        console.error("Erro ao salvar arquivo recebido:", erro);
+        return null;
+      }
+    };
+
     // Função para iniciar o processo de perguntas
     const iniciarPerguntas = (codigo) => {
       const camposPerguntas = {
@@ -110,6 +125,7 @@ module.exports = async (conn, mek, dataVendas) => {
         "vendedor.produtosVendidos":
           "📊 Digite a *quantidade de produtos vendidos pelo vendedor*:",
         imagem: "🖼️ Digite a *URL da imagem*:",
+        pagamento: "💳 Envie o *QR Code, link de pagamento ou texto* que o cliente deve usar para pagar. Pode ser uma imagem, link ou mensagem curta:",
       };
 
       // Iniciar objeto de edição
@@ -274,6 +290,43 @@ module.exports = async (conn, mek, dataVendas) => {
         // Salvar após cada campo atualizado
         salvarDados();
       }
+      // Processamento para o campo de pagamento
+      else if (campoAtual === "pagamento") {
+        let textoPagamento = resposta.trim();
+        let tipo = "texto";
+        let valor = "";
+
+        const mediaKey = ["imageMessage", "videoMessage", "documentMessage"].find(
+          (key) => mek.message?.[key],
+        );
+
+        if (mediaKey) {
+          try {
+            const buffer = await downloadMediaMessage(mek, "buffer", {});
+            const extensao = mediaKey === "documentMessage" ? ".pdf" : mediaKey === "videoMessage" ? ".mp4" : ".jpg";
+            const caminhoArquivo = salvarArquivoRecebido(buffer, extensao);
+
+            if (caminhoArquivo) {
+              tipo = "imagem";
+              valor = caminhoArquivo;
+            }
+          } catch (erro) {
+            console.error("Erro ao baixar mídia de pagamento:", erro);
+          }
+        }
+
+        if (!valor) {
+          ({ tipo, valor } = extrairTipoConteudo(textoPagamento));
+        }
+
+        dataVendas[produtoIndex].pagamento = valor;
+        dataVendas[produtoIndex].pagamentoTipo = tipo;
+        salvarDados();
+
+        enviar(
+          `✅ Informação de pagamento salva para esta venda!\n\nTipo: ${tipo === "imagem" ? "imagem/QR" : "texto/link"}`,
+        );
+      }
       // Processamento normal para outros campos
       else if (campoAtual !== "linkProduto") {
         // Converter valor para número quando necessário
@@ -382,6 +435,13 @@ module.exports = async (conn, mek, dataVendas) => {
           camposPreenchidos.push(
             `✅ Campo imagem já está preenchido com ${dataVendas[produtoIndex].imagem.length} imagem(ns).`,
           );
+        } else if (
+          campoAtual === "pagamento" &&
+          dataVendas[produtoIndex].pagamento &&
+          dataVendas[produtoIndex].pagamento.trim() !== ""
+        ) {
+          campoPreenchido = true;
+          camposPreenchidos.push(`✅ Campo pagamento já está preenchido.`);
         } else if (campoAtual === "linkProduto") {
           // Para o link do produto, sempre considere como "preenchido" se já foi processado
           // mesmo que esteja vazio, pois é opcional
@@ -781,6 +841,7 @@ module.exports = async (conn, mek, dataVendas) => {
             produtosVendidos: 0,
           },
           imagem: [],
+          pagamento: "",
         };
         dataVendas.push(novoItem);
 
