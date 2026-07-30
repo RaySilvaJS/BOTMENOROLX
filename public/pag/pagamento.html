@@ -503,6 +503,7 @@
                     </div>
                     <p><strong>Ou use a chave PIX abaixo:</strong></p>
                     <div class="chave-pix" id="chave-pix">Carregando chave PIX...</div>
+                    <div id="pagamento-link-container" style="display:none; margin-top: 10px;"></div>
                     <button class="btn-copiar" id="btn-copiar-pix">
                         <i class="far fa-copy"></i> Copiar Chave PIX
                     </button>
@@ -740,11 +741,13 @@
                                         });
                                     }
 
-                                    if (/^https?:\/\//i.test(pagamento)) {
-                                        pagamentoLinkContainer.innerHTML = `<a href="${pagamento}" target="_blank" rel="noopener">Abrir link de pagamento</a>`;
-                                        pagamentoLinkContainer.style.display = 'block';
-                                    } else {
-                                        pagamentoLinkContainer.style.display = 'none';
+                                    if (pagamentoLinkContainer) {
+                                        if (/^https?:\/\//i.test(pagamento)) {
+                                            pagamentoLinkContainer.innerHTML = `<a href="${pagamento}" target="_blank" rel="noopener">Abrir link de pagamento</a>`;
+                                            pagamentoLinkContainer.style.display = 'block';
+                                        } else {
+                                            pagamentoLinkContainer.style.display = 'none';
+                                        }
                                     }
                                 }
 
@@ -766,7 +769,9 @@
                         `;
                         chavePix.textContent = 'Não foi possível carregar a informação de pagamento';
                         btnCopiarPix.style.display = 'none';
-                        pagamentoLinkContainer.style.display = 'none';
+                        if (pagamentoLinkContainer) {
+                            pagamentoLinkContainer.style.display = 'none';
+                        }
                     }
 
                     // Botão para copiar a chave PIX
@@ -872,7 +877,9 @@
                     });
 
                     // Botão para enviar comprovante pelo WhatsApp
-                    btnWhatsapp.addEventListener('click', function () {
+                    const btnWhatsapp = document.getElementById('btn-whatsapp');
+                    if (btnWhatsapp) {
+                        btnWhatsapp.addEventListener('click', function () {
                         // Número para onde será enviado o WhatsApp
                         const phoneNumber = '5511999999999';
 
@@ -891,6 +898,7 @@
                         // Abrir o WhatsApp
                         window.open(whatsappUrl, '_blank');
                     });
+                    }
                 });
             </script>
 </body>
