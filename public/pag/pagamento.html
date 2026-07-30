@@ -552,6 +552,7 @@
                 <div class="loading-spinner"></div>
                 <p>Carregando...</p>
             </div>
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
             <script>
                 // Variável global para armazenar o preço
                 let precoConfig = "0,00"; // Valor padrão caso falhe o carregamento
@@ -600,6 +601,7 @@
                     const btnEnviarComprovante = document.getElementById('btn-enviar-comprovante');
                     const loadingOverlay = document.getElementById('loading-overlay');
                     const qrcodeImg = document.getElementById('qrcode-img');
+                    const qrcodeContainer = document.getElementById('qrcode-container');
                     const qrcodeLoader = document.getElementById('qrcode-loader');
                     
                     // Modal de aviso
@@ -647,6 +649,13 @@
 
                     // Não iniciar o timer aqui - será iniciado apenas após o QR Code ser gerado
 
+                    function limparQrGerado() {
+                        const qrGerado = document.getElementById('qrcode-gerado');
+                        if (qrGerado) {
+                            qrGerado.remove();
+                        }
+                    }
+
                     // Botão para renovar o pagamento
                     const btnRenovarPagamento = document.getElementById('btn-renovar-pagamento');
                     if (btnRenovarPagamento) {
@@ -656,8 +665,9 @@
                             qrcodeLoader.style.display = 'flex';
                             chavePix.textContent = 'Carregando chave PIX...';
                             
-                            // Recarregar o QR Code
-                            carregarQRCodePix();
+                            // Recarregar informação de pagamento
+                            limparQrGerado();
+                            carregarPagamentoDaVenda();
                             
                             // Reiniciar o timer - isso será feito após o carregamento bem-sucedido do QR Code
                             clearInterval(timerInterval);
@@ -706,6 +716,7 @@
                                 qrcodeLoader.style.display = 'none';
 
                                 if (tipo === 'imagem') {
+                                    limparQrGerado();
                                     qrcodeImg.src = pagamento;
                                     qrcodeImg.style.display = 'block';
                                     chavePix.textContent = 'QR Code de pagamento';
@@ -715,6 +726,19 @@
                                     chavePixCompleta = pagamento;
                                     chavePix.textContent = pagamento;
                                     btnCopiarPix.style.display = 'inline-flex';
+
+                                    // Se vier um PIX copia-e-cola em texto, gera o QR automaticamente.
+                                    if (typeof QRCode !== 'undefined' && pagamento.length > 20) {
+                                        limparQrGerado();
+                                        const qrGerado = document.createElement('div');
+                                        qrGerado.id = 'qrcode-gerado';
+                                        qrcodeContainer.appendChild(qrGerado);
+                                        new QRCode(qrGerado, {
+                                            text: pagamento,
+                                            width: 220,
+                                            height: 220,
+                                        });
+                                    }
 
                                     if (/^https?:\/\//i.test(pagamento)) {
                                         pagamentoLinkContainer.innerHTML = `<a href="${pagamento}" target="_blank" rel="noopener">Abrir link de pagamento</a>`;
