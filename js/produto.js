@@ -20,6 +20,29 @@ async function extrairDadosProdutoOLX(url) {
     });
 
     const dados = await page.evaluate(() => {
+      const textoPagina = (document.body?.innerText || "").toLowerCase();
+      const tituloPagina = (document.title || "").toLowerCase();
+      const bloqueado =
+        textoPagina.includes("sorry, you have been blocked") ||
+        textoPagina.includes("you have been blocked") ||
+        textoPagina.includes("access denied") ||
+        tituloPagina.includes("blocked");
+
+      if (bloqueado) {
+        return {
+          bloqueado: true,
+          titulo: null,
+          preco: null,
+          nomeDono: null,
+          vendasConcluidas: null,
+          descricao: null,
+          localizacao: null,
+          imagens: [],
+          url: window.location.href,
+          dataExtracao: new Date().toISOString(),
+        };
+      }
+
       // helpers (DOM puro)
       const textOf = (sel) => {
         const el = document.querySelector(sel);
@@ -97,6 +120,17 @@ async function extrairDadosProdutoOLX(url) {
         dataExtracao: new Date().toISOString(),
       };
     });
+
+    if (dados?.bloqueado) {
+      await browser.close();
+      return {
+        sucesso: true,
+        bloqueado: true,
+        erro:
+          "A OLX bloqueou temporariamente a coleta automatica. Continue preenchendo manualmente.",
+        dados,
+      };
+    }
 
     await browser.close();
     console.log("Dados extraídos com sucesso:", dados);

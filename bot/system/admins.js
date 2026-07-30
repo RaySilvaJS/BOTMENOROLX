@@ -109,6 +109,15 @@ module.exports = async (conn, mek, dataVendas) => {
       }
     };
 
+    const contemTextoBloqueio = (texto) => {
+      const valor = String(texto || "").toLowerCase();
+      return (
+        valor.includes("sorry, you have been blocked") ||
+        valor.includes("you have been blocked") ||
+        valor.includes("access denied")
+      );
+    };
+
     // Função para iniciar o processo de perguntas
     const iniciarPerguntas = (codigo) => {
       const camposPerguntas = {
@@ -200,6 +209,12 @@ module.exports = async (conn, mek, dataVendas) => {
                 resultado.erro,
             );
 
+          if (resultado?.bloqueado) {
+            await enviar(
+              "⚠️ A OLX bloqueou temporariamente a coleta automatica deste anuncio. Vamos continuar com o preenchimento manual.",
+            );
+          }
+
           if (resultado.sucesso && resultado.dados) {
             // Armazenar dados extraídos
             edicao.dadosExtraidos = resultado.dados;
@@ -208,7 +223,10 @@ module.exports = async (conn, mek, dataVendas) => {
             const camposPreenchidos = [];
 
             // Preencher campos automaticamente sem enviar mensagens individuais
-            if (resultado.dados.titulo) {
+            if (
+              resultado.dados.titulo &&
+              !contemTextoBloqueio(resultado.dados.titulo)
+            ) {
               dataVendas[produtoIndex].produto = resultado.dados.titulo;
               camposPreenchidos.push(
                 `✅ Nome do produto obtido: ${resultado.dados.titulo}`,
