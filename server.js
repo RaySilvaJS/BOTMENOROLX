@@ -169,6 +169,7 @@ app.use(express.json({ limit: "10mb" }));
 // Servir arquivos estáticos
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/data", express.static(path.join(__dirname, "data")));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Proxy de imagens remotas para evitar bloqueios de hotlink
 app.get("/proxy-image", async (req, res) => {

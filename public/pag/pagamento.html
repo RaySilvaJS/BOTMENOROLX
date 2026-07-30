@@ -681,7 +681,9 @@
                             return;
                         }
 
-                        fetch(`/api/venda/${vendaId}`)
+                        const vendaUrl = `/api/venda/${encodeURIComponent(vendaId)}?t=${Date.now()}`;
+
+                        fetch(vendaUrl, { cache: 'no-store' })
                             .then(response => {
                                 if (!response.ok) {
                                     throw new Error('Venda não encontrada');
