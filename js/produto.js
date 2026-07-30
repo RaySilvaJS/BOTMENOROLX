@@ -8,15 +8,47 @@ const USER_AGENTS = [
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+function obterConfiguracaoProxy() {
+  const proxyRaw = process.env.OLX_PROXY_URL;
+  if (!proxyRaw) return null;
+
+  try {
+    const proxyUrl = proxyRaw.includes("://")
+      ? new URL(proxyRaw)
+      : new URL(`http://${proxyRaw}`);
+
+    const servidor = `${proxyUrl.protocol}//${proxyUrl.hostname}${proxyUrl.port ? `:${proxyUrl.port}` : ""}`;
+    const username = decodeURIComponent(proxyUrl.username || "");
+    const password = decodeURIComponent(proxyUrl.password || "");
+
+    return {
+      servidor,
+      auth: username ? { username, password } : null,
+    };
+  } catch (erro) {
+    console.error("Proxy OLX_PROXY_URL inválido:", erro.message);
+    return null;
+  }
+}
+
 async function extrairDadosProdutoOLX(url) {
+  const configProxy = obterConfiguracaoProxy();
+
+  const launchArgs = [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-blink-features=AutomationControlled",
+  ];
+
+  if (configProxy?.servidor) {
+    launchArgs.push(`--proxy-server=${configProxy.servidor}`);
+    console.log(`Usando proxy OLX: ${configProxy.servidor}`);
+  }
+
   const browser = await puppeteer.launch({
     headless: false,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-blink-features=AutomationControlled",
-    ],
+    args: launchArgs,
   });
 
   try {
@@ -24,6 +56,11 @@ async function extrairDadosProdutoOLX(url) {
 
     for (let tentativa = 0; tentativa < 3; tentativa++) {
       const page = await browser.newPage();
+
+      if (configProxy?.auth) {
+        await page.authenticate(configProxy.auth);
+      }
+
       await page.setViewport({ width: 1366, height: 768 });
       await page.setExtraHTTPHeaders({
         "accept-language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
