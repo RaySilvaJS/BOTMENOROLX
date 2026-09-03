@@ -31,6 +31,37 @@ function obterConfiguracaoProxy() {
   }
 }
 
+async function fecharConsentimentoCookies(page) {
+  try {
+    await page.evaluate(() => {
+      const seletoresBotao = [
+        "#didomi-notice-agree-button",
+        ".didomi-continue-without-agreeing",
+        "#onetrust-accept-btn-handler",
+        'button[id*="consent" i]',
+      ];
+      for (const sel of seletoresBotao) {
+        const btn = document.querySelector(sel);
+        if (btn) {
+          btn.click();
+          return;
+        }
+      }
+
+      const textosAceitar = ["consent", "aceitar", "concordo", "concordar"];
+      const botoes = Array.from(document.querySelectorAll("button"));
+      const alvo = botoes.find((b) => {
+        const texto = (b.innerText || "").trim().toLowerCase();
+        return textosAceitar.some((t) => texto === t || texto.includes(t));
+      });
+      if (alvo) alvo.click();
+    });
+  } catch (e) {
+    /* ignora se não houver popup de consentimento */
+  }
+  await wait(500);
+}
+
 async function extrairDadosProdutoOLX(url) {
   const configProxy = obterConfiguracaoProxy();
 
@@ -74,6 +105,8 @@ async function extrairDadosProdutoOLX(url) {
       });
 
       await page.goto(url, { waitUntil: "networkidle2", timeout: 30000 });
+
+      await fecharConsentimentoCookies(page);
 
       await page
         .waitForSelector("span.typo-body-small.text-neutral-120.font-regular", {
@@ -129,6 +162,19 @@ async function extrairDadosProdutoOLX(url) {
           return texto || null;
         };
 
+        const textoTitulo = () => {
+          const candidatos = Array.from(document.querySelectorAll("h1"));
+          const valido = candidatos.find((el) => {
+            const texto = (el.innerText || el.textContent || "").trim();
+            if (!texto) return false;
+            const dentroDeConsentimento = el.closest(
+              '[id*="didomi" i], [class*="didomi" i], [id*="onetrust" i], [class*="onetrust" i], [id*="consent" i], [class*="consent" i], [id*="cookie" i], [class*="cookie" i]'
+            );
+            return !dentroDeConsentimento;
+          });
+          return valido ? valido.innerText.trim() : null;
+        };
+
         const allTexts = (sel) => {
           const nodes = Array.from(document.querySelectorAll(sel) || []);
           return nodes.map((n) => n.innerText.trim());
@@ -174,7 +220,7 @@ async function extrairDadosProdutoOLX(url) {
 
         return {
           titulo:
-            textOf("h1") ||
+            textoTitulo() ||
             textOf("#description-title span.typo-title-medium") ||
             textOf("#description-title"),
           preco:
