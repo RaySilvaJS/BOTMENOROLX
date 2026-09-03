@@ -788,7 +788,7 @@ module.exports = async (conn, mek, dataVendas) => {
           let deuStash = false;
           try {
             const { stdout: statusOut } = await execComRetry(
-              "git status --porcelain",
+              "git status --porcelain --untracked-files=no",
             );
             deuStash = statusOut.trim().length > 0;
 
