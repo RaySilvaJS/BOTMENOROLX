@@ -766,20 +766,38 @@ module.exports = async (conn, mek, dataVendas) => {
         var util = require("util");
         var execPromise = util.promisify(require("child_process").exec);
 
+        // OneDrive trava o .git/index periodicamente durante a sincronização;
+        // essas falhas são passageiras, então vale tentar de novo antes de desistir.
+        var execComRetry = async (cmd, tentativas = 3, esperaMs = 2000) => {
+          for (let i = 1; i <= tentativas; i++) {
+            try {
+              return await execPromise(cmd);
+            } catch (erro) {
+              const mensagem = erro.stderr || erro.message || "";
+              const eLockTransitorio =
+                /could not write index|index\.lock|unable to create|resource busy|EBUSY/i.test(
+                  mensagem,
+                );
+              if (!eLockTransitorio || i === tentativas) throw erro;
+              await new Promise((resolve) => setTimeout(resolve, esperaMs));
+            }
+          }
+        };
+
         (async () => {
           let deuStash = false;
           try {
-            const { stdout: statusOut } = await execPromise(
+            const { stdout: statusOut } = await execComRetry(
               "git status --porcelain",
             );
             deuStash = statusOut.trim().length > 0;
 
-            if (deuStash) await execPromise("git stash");
+            if (deuStash) await execComRetry("git stash");
 
-            const { stdout: pullOut } = await execPromise("git pull");
+            const { stdout: pullOut } = await execComRetry("git pull");
 
             if (deuStash) {
-              await execPromise("git stash pop");
+              await execComRetry("git stash pop");
               deuStash = false;
             }
 
