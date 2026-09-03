@@ -85,6 +85,18 @@ async function extrairDadosProdutoOLX(url) {
       await page.waitForSelector("h1", { timeout: 8000 }).catch(() => {
         /* ignora se não aparecer */
       });
+      await page
+        .waitForFunction(
+          () => {
+            const h1 = document.querySelector("h1");
+            const preco = document.querySelector("#price-box-container");
+            return h1?.innerText?.trim() && preco?.innerText?.includes("R$");
+          },
+          { timeout: 10000 }
+        )
+        .catch(() => {
+          /* ignora se não hidratar a tempo */
+        });
 
       const dados = await page.evaluate(() => {
         const textoPagina = (document.body?.innerText || "").toLowerCase();
@@ -112,7 +124,9 @@ async function extrairDadosProdutoOLX(url) {
 
         const textOf = (sel) => {
           const el = document.querySelector(sel);
-          return el ? el.innerText.trim() : null;
+          if (!el) return null;
+          const texto = (el.innerText || el.textContent || "").trim();
+          return texto || null;
         };
 
         const allTexts = (sel) => {
@@ -159,21 +173,22 @@ async function extrairDadosProdutoOLX(url) {
         }
 
         return {
-          titulo: textOf("h1"),
+          titulo:
+            textOf("h1") ||
+            textOf("#description-title span.typo-title-medium") ||
+            textOf("#description-title"),
           preco:
             (
-              textOf(
-                "#price-box-container > div.ad__sc-q5xder-1.hoJpM > div:nth-child(1) > div > span > span"
-              ) || ""
+              textOf("#price-box-container span.font-semibold.text-neutral-100") ||
+              textOf("#price-box-container .typo-display-large") ||
+              ""
             )
               .replace("R$", "")
               .replace(/\./g, "")
               .trim() || null,
-          nomeDono: textOf("span.typo-body-large.ad__sc-ypp2u2-4.TTTuh"),
+          nomeDono: textOf("span.typo-body-large[class*='ad__sc-ypp2u2-4']"),
           vendasConcluidas: textOf("span.typo-body-large.font-semibold.mr-0-25"),
-          descricao: textOf(
-            "#description-title > div > div.ad__sc-2mjlki-0.cbbFAE.olx-d-flex.olx-ai-flex-start.olx-fd-column > div > span > span"
-          ),
+          descricao: textOf(".advc-ad-description__lines") || textOf(".advc-ad-description"),
           localizacao,
           imagens: obterImagens(),
           url: window.location.href,
