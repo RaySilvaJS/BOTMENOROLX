@@ -763,28 +763,41 @@ module.exports = async (conn, mek, dataVendas) => {
 
       case "att":
         enviar("Atualizando o bot... Aguarde um momento.");
-        var { exec } = require("child_process");
+        var util = require("util");
+        var execPromise = util.promisify(require("child_process").exec);
 
-        // Comando encadeado: stash -> pull -> stash pop
-        exec(
-          "git stash && git pull && git stash pop",
-          (erro, stdout, stderr) => {
-            if (erro) return enviar(`Ocorreu um erro: ${erro.message}`);
+        (async () => {
+          let deuStash = false;
+          try {
+            const { stdout: statusOut } = await execPromise(
+              "git status --porcelain",
+            );
+            deuStash = statusOut.trim().length > 0;
 
-            if (stdout.includes("Already up to date."))
-              return enviar("O bot já está atualizado.");
+            if (deuStash) await execPromise("git stash");
 
-            if (stdout) {
-              enviar(
-                `✅ Bot atualizado com sucesso!\n\nDetalhes:\n${stdout.trim()}\n\nReiniciando para aplicar as mudanças...`,
-              );
+            const { stdout: pullOut } = await execPromise("git pull");
 
-              setTimeout(() => {
-                process.exit(0);
-              }, 2000);
+            if (deuStash) {
+              await execPromise("git stash pop");
+              deuStash = false;
             }
-          },
-        );
+
+            if (pullOut.includes("Already up to date.")) {
+              return enviar("O bot já está atualizado.");
+            }
+
+            enviar(
+              `✅ Bot atualizado com sucesso!\n\nDetalhes:\n${pullOut.trim()}\n\nReiniciando para aplicar as mudanças...`,
+            );
+
+            setTimeout(() => {
+              process.exit(0);
+            }, 2000);
+          } catch (erro) {
+            enviar(`Ocorreu um erro: ${erro.message}`);
+          }
+        })();
         break;
 
       // case "olx":
