@@ -797,7 +797,45 @@ module.exports = async (conn, mek, dataVendas) => {
             const { stdout: pullOut } = await execComRetry("git pull");
 
             if (deuStash) {
-              await execComRetry("git stash pop");
+              try {
+                await execComRetry("git stash pop");
+              } catch (erroPop) {
+                // Conflito comum: um arquivo de dados de runtime (config.json,
+                // vendas.json, uploads...) que acabou de sair do controle de
+                // versão nesse pull, mas ainda estava modificado no stash local.
+                // Só resolvemos automaticamente esse padrão específico
+                // ("deletado por nós" nos dois lados) — qualquer outro tipo de
+                // conflito é repassado para revisão manual.
+                const { stdout: statusPorcelain } = await execPromise(
+                  "git status --porcelain",
+                );
+                const linhas = statusPorcelain
+                  .split("\n")
+                  .filter((linha) => linha.trim().length > 0);
+                const linhasConflito = linhas.filter((linha) =>
+                  linha.startsWith("DU "),
+                );
+                const apenasConflitosSeguro =
+                  linhasConflito.length > 0 &&
+                  linhasConflito.length === linhas.length;
+
+                if (!apenasConflitosSeguro) throw erroPop;
+
+                for (const linha of linhasConflito) {
+                  const arquivo = linha.slice(3).trim();
+                  await execPromise(`git rm --cached "${arquivo}"`);
+                }
+
+                try {
+                  await execPromise(
+                    'git commit -m "Resolver conflito automático: parar de rastrear arquivo(s) de runtime"',
+                  );
+                } catch (erroCommit) {
+                  /* nada para commitar, tudo bem */
+                }
+
+                await execPromise("git stash drop");
+              }
               deuStash = false;
             }
 
