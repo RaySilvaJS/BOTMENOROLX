@@ -784,15 +784,77 @@ module.exports = async (conn, mek, dataVendas) => {
           }
         };
 
+        // Detecta conflitos de merge (linhas "DU"/"UU"/"AU"/etc de `git status --porcelain`)
+        // e, se forem apenas arquivos de runtime "deletados por nós" (config.json,
+        // vendas.json, uploads...), resolve automaticamente. Qualquer outro tipo de
+        // conflito é reportado para revisão manual em vez de seguir adiante.
+        var resolverConflitosSeguros = async () => {
+          const { stdout: statusPorcelain } = await execPromise(
+            "git status --porcelain",
+          );
+          const linhas = statusPorcelain
+            .split("\n")
+            .filter((linha) => linha.trim().length > 0);
+          const linhasConflito = linhas.filter((linha) =>
+            /^(DD|AU|UD|UA|DU|AA|UU) /.test(linha),
+          );
+
+          if (linhasConflito.length === 0) {
+            return { temConflito: false, resolvido: false };
+          }
+
+          const apenasConflitosSeguro =
+            linhasConflito.length > 0 &&
+            linhasConflito.every((linha) => linha.startsWith("DU "));
+
+          if (!apenasConflitosSeguro) {
+            return {
+              temConflito: true,
+              resolvido: false,
+              arquivos: linhasConflito.map((linha) => linha.slice(3).trim()),
+            };
+          }
+
+          for (const linha of linhasConflito) {
+            const arquivo = linha.slice(3).trim();
+            await execPromise(`git rm --cached "${arquivo}"`);
+          }
+
+          try {
+            await execPromise(
+              'git commit -m "Resolver conflito automático: parar de rastrear arquivo(s) de runtime"',
+            );
+          } catch (erroCommit) {
+            /* nada para commitar, tudo bem */
+          }
+
+          return { temConflito: true, resolvido: true };
+        };
+
         (async () => {
           let deuStash = false;
           try {
+            const conflitoPreExistente = await resolverConflitosSeguros();
+            if (conflitoPreExistente.temConflito && !conflitoPreExistente.resolvido) {
+              return enviar(
+                `⚠️ O repositório tem conflitos de merge não resolvidos:\n${conflitoPreExistente.arquivos.join("\n")}\n\nResolva manualmente (git status) antes de rodar /att novamente.`,
+              );
+            }
+
             const { stdout: statusOut } = await execComRetry(
               "git status --porcelain --untracked-files=no",
             );
             deuStash = statusOut.trim().length > 0;
 
-            if (deuStash) await execComRetry("git stash");
+            if (deuStash) {
+              try {
+                await execComRetry("git stash");
+              } catch (erroStash) {
+                return enviar(
+                  `❌ Não foi possível guardar as alterações locais para atualizar: ${erroStash.message}`,
+                );
+              }
+            }
 
             const { stdout: pullOut } = await execComRetry("git pull");
 
@@ -800,40 +862,8 @@ module.exports = async (conn, mek, dataVendas) => {
               try {
                 await execComRetry("git stash pop");
               } catch (erroPop) {
-                // Conflito comum: um arquivo de dados de runtime (config.json,
-                // vendas.json, uploads...) que acabou de sair do controle de
-                // versão nesse pull, mas ainda estava modificado no stash local.
-                // Só resolvemos automaticamente esse padrão específico
-                // ("deletado por nós" nos dois lados) — qualquer outro tipo de
-                // conflito é repassado para revisão manual.
-                const { stdout: statusPorcelain } = await execPromise(
-                  "git status --porcelain",
-                );
-                const linhas = statusPorcelain
-                  .split("\n")
-                  .filter((linha) => linha.trim().length > 0);
-                const linhasConflito = linhas.filter((linha) =>
-                  linha.startsWith("DU "),
-                );
-                const apenasConflitosSeguro =
-                  linhasConflito.length > 0 &&
-                  linhasConflito.length === linhas.length;
-
-                if (!apenasConflitosSeguro) throw erroPop;
-
-                for (const linha of linhasConflito) {
-                  const arquivo = linha.slice(3).trim();
-                  await execPromise(`git rm --cached "${arquivo}"`);
-                }
-
-                try {
-                  await execPromise(
-                    'git commit -m "Resolver conflito automático: parar de rastrear arquivo(s) de runtime"',
-                  );
-                } catch (erroCommit) {
-                  /* nada para commitar, tudo bem */
-                }
-
+                const resultado = await resolverConflitosSeguros();
+                if (!resultado.resolvido) throw erroPop;
                 await execPromise("git stash drop");
               }
               deuStash = false;
