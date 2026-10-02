@@ -598,13 +598,15 @@ app.post("/api/pix/criar", async (req, res) => {
 
   const resultado = await qrcodePagamentos.gerarQRCode(`${vendaId}-${Date.now()}`);
   if (!resultado.idTransaction) {
-    try {
-      await enviarMensagemWhatsApp(
-        `*⚠️ ERRO AO GERAR PIX ⚠️*\n\nVenda: ${vendaId}\n${resultado.error}\n\nHorário: ${new Date().toLocaleString("pt-BR")}`,
-      );
-    } catch (notifyError) {
-      console.error("Erro ao enviar notificação do WhatsApp:", notifyError);
-    }
+    // Aviso em segundo plano: não pode segurar a resposta da página
+    enviarMensagemWhatsApp(
+      `*⚠️ ERRO AO GERAR PIX ⚠️*
+
+Venda: ${vendaId}
+${resultado.error}
+
+Horário: ${new Date().toLocaleString("pt-BR")}`,
+    ).catch((e) => console.error("Erro ao enviar notificação do WhatsApp:", e));
     return res.status(502).json({
       success: false,
       message: "Não foi possível gerar o PIX. Tente novamente em instantes.",
@@ -657,8 +659,8 @@ app.get("/api/pix/status/:vendaId", async (req, res) => {
     if (!jaNotificado) {
       const venda = buscarVenda(vendaId) || {};
       try {
-        await enviarMensagemWhatsApp(
-          `*✅ PAGAMENTO PIX CONFIRMADO ✅*\n\nVenda: ${vendaId}\nProduto: ${venda.nome || venda.titulo || "-"}\nTransação: ${cobranca.idTransaction}\n\nConfirmado em: ${new Date().toLocaleString("pt-BR")}`,
+        enviarMensagemWhatsApp(
+          `*✅ PAGAMENTO PIX CONFIRMADO ✅*\n\nVenda: ${vendaId}\nProduto: ${venda.produto || "-"}\nTransação: ${cobranca.idTransaction}\n\nConfirmado em: ${new Date().toLocaleString("pt-BR")}`,
         );
       } catch (notifyError) {
         console.error("Erro ao enviar notificação do WhatsApp:", notifyError);
