@@ -134,7 +134,6 @@ module.exports = async (conn, mek, dataVendas) => {
         "vendedor.produtosVendidos":
           "📊 Digite a *quantidade de produtos vendidos pelo vendedor*:",
         imagem: "🖼️ Digite a *URL da imagem*:",
-        pagamento: "💳 Envie o *QR Code, link de pagamento ou texto* que o cliente deve usar para pagar. Pode ser uma imagem, link ou mensagem curta:",
       };
 
       // Iniciar objeto de edição
@@ -983,7 +982,6 @@ module.exports = async (conn, mek, dataVendas) => {
             produtosVendidos: 0,
           },
           imagem: [],
-          pagamento: "",
         };
         dataVendas.push(novoItem);
 
