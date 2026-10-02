@@ -658,13 +658,33 @@ app.get("/api/pix/status/:vendaId", async (req, res) => {
 
     if (!jaNotificado) {
       const venda = buscarVenda(vendaId) || {};
+      let valorPago = "";
       try {
-        enviarMensagemWhatsApp(
-          `*✅ PAGAMENTO PIX CONFIRMADO ✅*\n\nVenda: ${vendaId}\nProduto: ${venda.produto || "-"}\nTransação: ${cobranca.idTransaction}\n\nConfirmado em: ${new Date().toLocaleString("pt-BR")}`,
-        );
-      } catch (notifyError) {
-        console.error("Erro ao enviar notificação do WhatsApp:", notifyError);
-      }
+        const preco = JSON.parse(
+          fs.readFileSync(path.join(__dirname, "public", "config.json"), "utf8"),
+        ).preco;
+        valorPago = Number(String(preco).replace(",", ".")).toLocaleString("pt-BR", {
+          minimumFractionDigits: 2,
+        });
+      } catch {}
+
+      const linhas = [
+        "🎉🎉🎉 *FINALMENTEEEE! PARABÉNS! PAGOUUU!* 🎉🎉🎉",
+        "",
+        "🔥 *FAZ PAGAR! FAZ PAGAR!!* 🔥",
+        "",
+        `💰 *CLIENTE PAGOU R$ ${valorPago}* 💰`,
+        "",
+        `📦 Produto: ${venda.produto || "-"}`,
+        `🆔 Venda: ${vendaId}`,
+        `🕐 ${new Date().toLocaleString("pt-BR")}`,
+        "",
+        "🚀🚀 BORA FECHAR MAIS UMA! 🚀🚀",
+      ];
+      // Em segundo plano: não segura a resposta da página
+      enviarMensagemWhatsApp(linhas.join("\n")).catch((e) =>
+        console.error("Erro ao enviar notificação do WhatsApp:", e),
+      );
     }
     return res.json({ success: true, pago: true });
   }
