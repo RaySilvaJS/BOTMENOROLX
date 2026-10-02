@@ -594,6 +594,7 @@
                     const timerExpirado = document.getElementById('timer-expirado');
                     let tempoRestante = 10 * 60; // 10 minutos em segundos
                     let timerInterval;
+                    let pollingInterval = null; // verificação de pagamento (declarada antes da 1ª chamada)
 
                     // Função para atualizar o timer
                     function atualizarTimer() {
@@ -741,8 +742,6 @@
                     function setPagamentoFeito() {
                         document.cookie = "pagamentoFeito=true; path=/; max-age=172800"; // 2 dias
                     }
-
-                    let pollingInterval = null;
 
                     function pararVerificacao() {
                         if (pollingInterval) {
