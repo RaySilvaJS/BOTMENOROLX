@@ -680,6 +680,31 @@ module.exports = async (conn, mek, dataVendas) => {
         }, 2000);
         break;
 
+      case "lofypay": {
+        const [publicKey, secretKey] = args;
+
+        if (!publicKey || !secretKey) {
+          return enviar(
+            "⚠️ Uso: /lofypay <public key> <secret key>\n\nExemplo:\n/lofypay pk_live_xxx sk_live_xxx",
+          );
+        }
+
+        if (!secretKey.startsWith("sk_")) {
+          return enviar(
+            "⚠️ A secret key deve começar com sk_live_ (ou sk_test_). Confira a ordem: public key primeiro, depois a secret.",
+          );
+        }
+
+        const cfgLofy = JSON.parse(fs.readFileSync("./config.json"));
+        cfgLofy.lofypay = { publicKey, secretKey };
+        fs.writeFileSync("./config.json", JSON.stringify(cfgLofy, null, 2));
+
+        enviar(
+          `✅ LofyPay atualizado!\n\nPublic: ${publicKey}\nSecret: ${secretKey.slice(0, 8)}...${secretKey.slice(-4)}\n\nJá vale para os próximos PIX, sem reiniciar.`,
+        );
+        break;
+      }
+
       case "valor":
         const valor = args.join(" ");
 

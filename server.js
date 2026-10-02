@@ -472,73 +472,6 @@ app.get("/api/privacidade", (req, res) => {
   });
 });
 
-// Endpoint para receber comprovante e enviar via WhatsApp
-app.post(
-  "/api/enviar-comprovante",
-  upload.single("comprovante"),
-  async (req, res) => {
-    console.log("Recebendo requisição para enviar comprovante");
-
-    try {
-      // Verificar se o arquivo foi recebido
-      if (!req.file) {
-        console.error("Nenhum arquivo recebido");
-        return res.status(400).json({
-          success: false,
-          message: "Nenhum arquivo de comprovante recebido",
-        });
-      }
-
-      console.log("Arquivo recebido:", req.file);
-
-      // Verificar status do WhatsApp antes de tentar enviar
-      if (!verificarStatusWhatsApp()) {
-        console.error("Tentativa de envio com WhatsApp desconectado");
-        return res.status(503).json({
-          success: false,
-          message:
-            "Serviço do WhatsApp indisponível no momento. Tente novamente mais tarde.",
-        });
-      }
-
-      // Extrair dados do formulário
-      const chavePix = req.body.chavePix || "Não informada";
-      const valor = req.body.valor || "Não informado";
-
-      // Formatar mensagem para o comprovante
-      const caption =
-        `*COMPROVANTE DE PAGAMENTO RECEBIDO*\n\n` +
-        `*Dados do Pagamento:*\n` +
-        `Valor: R$ ${valor}\n` +
-        `Chave PIX: ${chavePix}\n\n` +
-        `Recebido em: ${new Date().toLocaleString("pt-BR")}`;
-
-      // Enviar o arquivo pelo WhatsApp
-      const resultado = await enviarArquivoWhatsApp(req.file.path, caption);
-
-      if (resultado.success) {
-        res.json({
-          success: true,
-          message: "Comprovante enviado com sucesso para o WhatsApp",
-        });
-      } else {
-        res.status(500).json({
-          success: false,
-          message: "Erro ao enviar comprovante para o WhatsApp",
-          error: resultado.message,
-        });
-      }
-    } catch (error) {
-      console.error("Erro ao processar envio de comprovante:", error);
-      res.status(500).json({
-        success: false,
-        message: "Erro ao processar sua solicitação",
-        error: error.message,
-      });
-    }
-  }
-);
-
 // Endpoint para notificar quando o cliente clica em "Continuar"
 app.post("/api/notificar-clique-continuar", async (req, res) => {
   console.log("Cliente clicou em botão de ação");
@@ -608,56 +541,133 @@ app.post("/api/notificar-clique-continuar", async (req, res) => {
   }
 });
 
-// Importar o módulo qrcodepagamentos
-const qrcodePagamentos = require('./js/qrcodepagamentos');
+// ===== PIX LofyPay: criação da cobrança + verificação automática de pagamento =====
+const qrcodePagamentos = require("./js/qrcodepagamentos");
+const PIX_FILE = path.join(__dirname, "data", "pix.json");
+const PIX_VALIDADE_MS = 10 * 60 * 1000;
 
-// Endpoint para gerar QR Code PIX
-app.get("/api/gerar-qrcode-pix", async (req, res) => {
+function lerPix() {
   try {
-    console.log("Gerando QR Code PIX...");
-    const resultado = await qrcodePagamentos.gerarQRCode();
+    return JSON.parse(fs.readFileSync(PIX_FILE, "utf8"));
+  } catch {
+    return {};
+  }
+}
 
-    if (resultado?.status === 404 || resultado?.status === 401 || resultado?.status === 403 || resultado?.status === 500) {
-      const mensagemErro = resultado?.error || "Erro ao gerar QR Code PIX";
-      console.error("Falha ao gerar QR Code PIX:", mensagemErro);
+function salvarPix(dados) {
+  fs.writeFileSync(PIX_FILE, JSON.stringify(dados, null, 2));
+}
 
+function buscarVenda(id) {
+  try {
+    const vendas = JSON.parse(
+      fs.readFileSync(path.join(__dirname, "data", "vendas.json"), "utf8"),
+    );
+    return vendas.find((v) => v.codigo === id) || null;
+  } catch {
+    return null;
+  }
+}
+
+// Cria (ou reaproveita, se ainda válida) a cobrança PIX da venda
+app.post("/api/pix/criar", async (req, res) => {
+  const vendaId = String(req.body?.vendaId || "");
+  const renovar = req.body?.renovar === true;
+
+  if (!buscarVenda(vendaId)) {
+    return res.status(404).json({ success: false, message: "Venda não encontrada" });
+  }
+
+  const pix = lerPix();
+  const registro = pix[vendaId] || { cobrancas: [], pago: false };
+
+  if (registro.pago) {
+    return res.json({ success: true, pago: true });
+  }
+
+  const ultima = registro.cobrancas[registro.cobrancas.length - 1];
+  if (!renovar && ultima && Date.now() - ultima.criadoEm < PIX_VALIDADE_MS) {
+    return res.json({
+      success: true,
+      pago: false,
+      pixCode: ultima.pixCode,
+      qrCodeBase64: ultima.qrCodeBase64,
+      criadoEm: ultima.criadoEm,
+    });
+  }
+
+  const resultado = await qrcodePagamentos.gerarQRCode(`${vendaId}-${Date.now()}`);
+  if (!resultado.idTransaction) {
+    try {
+      await enviarMensagemWhatsApp(
+        `*⚠️ ERRO AO GERAR PIX ⚠️*\n\nVenda: ${vendaId}\n${resultado.error}\n\nHorário: ${new Date().toLocaleString("pt-BR")}`,
+      );
+    } catch (notifyError) {
+      console.error("Erro ao enviar notificação do WhatsApp:", notifyError);
+    }
+    return res.status(502).json({
+      success: false,
+      message: "Não foi possível gerar o PIX. Tente novamente em instantes.",
+    });
+  }
+
+  const cobranca = {
+    idTransaction: resultado.idTransaction,
+    pixCode: resultado.pixTitle,
+    qrCodeBase64: resultado.imgBase64,
+    criadoEm: Date.now(),
+  };
+  registro.cobrancas.push(cobranca);
+  pix[vendaId] = registro;
+  salvarPix(pix);
+
+  res.json({
+    success: true,
+    pago: false,
+    pixCode: cobranca.pixCode,
+    qrCodeBase64: cobranca.qrCodeBase64,
+    criadoEm: cobranca.criadoEm,
+  });
+});
+
+// Consulta o LofyPay (no servidor, com a secret key) se alguma cobrança da venda foi paga
+app.get("/api/pix/status/:vendaId", async (req, res) => {
+  const vendaId = req.params.vendaId;
+  const pix = lerPix();
+  const registro = pix[vendaId];
+
+  if (!registro) {
+    return res.status(404).json({ success: false, message: "Nenhum PIX gerado para esta venda" });
+  }
+
+  if (registro.pago) {
+    return res.json({ success: true, pago: true });
+  }
+
+  for (const cobranca of registro.cobrancas) {
+    const r = await qrcodePagamentos.consultarStatus(cobranca.idTransaction);
+    if (!r.pago) continue;
+
+    // Relê antes de gravar para não atropelar outra requisição simultânea
+    const atual = lerPix();
+    const jaNotificado = atual[vendaId]?.pago;
+    atual[vendaId] = { ...(atual[vendaId] || registro), pago: true, pagoEm: Date.now() };
+    salvarPix(atual);
+
+    if (!jaNotificado) {
+      const venda = buscarVenda(vendaId) || {};
       try {
         await enviarMensagemWhatsApp(
-          `*⚠️ ERRO AO GERAR QR CODE PIX ⚠️*\n\n${mensagemErro}\n\nHorário: ${new Date().toLocaleString("pt-BR")}`,
+          `*✅ PAGAMENTO PIX CONFIRMADO ✅*\n\nVenda: ${vendaId}\nProduto: ${venda.nome || venda.titulo || "-"}\nTransação: ${cobranca.idTransaction}\n\nConfirmado em: ${new Date().toLocaleString("pt-BR")}`,
         );
       } catch (notifyError) {
         console.error("Erro ao enviar notificação do WhatsApp:", notifyError);
       }
-
-      return res.status(resultado?.status || 500).json({
-        success: false,
-        message: "Não foi possível gerar o QR Code PIX",
-        error: mensagemErro,
-      });
     }
-
-    if (!resultado || !resultado.imgBase64) {
-      console.error("Erro ao gerar QR Code PIX: Resultado inválido");
-      return res.status(500).json({
-        success: false,
-        message: "Não foi possível gerar o QR Code PIX",
-        resultado,
-      });
-    }
-
-    res.json({
-      success: true,
-      qrCodeBase64: resultado.imgBase64,
-      pixTitle: resultado.pixTitle,
-    });
-  } catch (error) {
-    console.error("Erro ao gerar QR Code PIX:", error);
-    res.status(500).json({
-      success: false,
-      message: "Erro ao gerar QR Code PIX",
-      error: error.message,
-    });
+    return res.json({ success: true, pago: true });
   }
+
+  res.json({ success: true, pago: false });
 });
 
 // Rota padrão para qualquer outra solicitação (SPA pattern)
