@@ -34,7 +34,46 @@ Observações:
 
 ---
 
-# 1. Estrutura utilizada
+# 1. Liberar portas (Inbound Rules)
+
+Este é o primeiro passo: libere as portas de entrada (Inbound Rules) antes de configurar qualquer outra coisa.
+
+## 1.1 No painel do provedor da VPS
+
+Em Firewall / Security Group / Inbound Rules do provedor, libere:
+
+```text
+TCP 80   (HTTP)
+TCP 443  (HTTPS)
+```
+
+## 1.2 No Windows Firewall
+
+Abra PowerShell como Administrador.
+
+Não coloque `C:\Windows\System32>` antes do comando.
+
+Execute:
+
+```powershell
+New-NetFirewallRule -DisplayName "Nginx HTTP" -Direction Inbound -Protocol TCP -LocalPort 80 -Action Allow
+```
+
+E:
+
+```powershell
+New-NetFirewallRule -DisplayName "Nginx HTTPS" -Direction Inbound -Protocol TCP -LocalPort 443 -Action Allow
+```
+
+Verifique:
+
+```powershell
+Get-NetFirewallRule -DisplayName "Nginx HTTP"
+```
+
+---
+
+# 2. Estrutura utilizada
 
 Exemplo:
 
@@ -79,7 +118,7 @@ localhost:3000
 
 ---
 
-# 2. Instalar Node.js
+# 3. Instalar Node.js
 
 Instale o Git for Windows (https://git-scm.com/download/win) e depois o Node.js LTS (https://nodejs.org/en/download) na VPS.
 
@@ -123,7 +162,7 @@ O site precisa funcionar antes de configurar o Nginx.
 
 ---
 
-# 3. Instalar / colocar o Nginx
+# 4. Instalar / colocar o Nginx
 
 Baixe o Nginx para Windows: https://nginx.org/download/nginx-1.28.0.zip
 
@@ -154,7 +193,7 @@ test is successful
 
 ---
 
-# 4. Criar a pasta para validação do Let's Encrypt
+# 5. Criar a pasta para validação do Let's Encrypt
 
 Dentro da raiz do site:
 
@@ -177,7 +216,7 @@ echo funcionando > .well-known\acme-challenge\teste.txt
 
 ---
 
-# 5. Configuração inicial do Nginx — HTTP
+# 6. Configuração inicial do Nginx — HTTP
 
 Antes de configurar HTTPS, use HTTP para testar.
 
@@ -234,7 +273,7 @@ http {
 
 ---
 
-# 6. Testar o Nginx
+# 7. Testar o Nginx
 
 Na pasta do Nginx:
 
@@ -262,7 +301,7 @@ Se o Nginx já estiver rodando:
 
 ---
 
-# 7. Verificar se o Nginx está rodando
+# 8. Verificar se o Nginx está rodando
 
 No PowerShell:
 
@@ -286,32 +325,6 @@ Deve aparecer:
 
 ```text
 TCP    0.0.0.0:80    0.0.0.0:0    LISTENING
-```
-
----
-
-# 8. Liberar portas no Windows Firewall
-
-Abra PowerShell como Administrador.
-
-Não coloque `C:\Windows\System32>` antes do comando.
-
-Execute:
-
-```powershell
-New-NetFirewallRule -DisplayName "Nginx HTTP" -Direction Inbound -Protocol TCP -LocalPort 80 -Action Allow
-```
-
-E:
-
-```powershell
-New-NetFirewallRule -DisplayName "Nginx HTTPS" -Direction Inbound -Protocol TCP -LocalPort 443 -Action Allow
-```
-
-Verifique:
-
-```powershell
-Get-NetFirewallRule -DisplayName "Nginx HTTP"
 ```
 
 ---
