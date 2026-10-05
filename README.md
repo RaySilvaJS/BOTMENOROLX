@@ -47,9 +47,24 @@ TCP 80   (HTTP)
 TCP 443  (HTTPS)
 ```
 
-## 1.2 No Windows Firewall
+## 1.2 No Windows Firewall — pela interface (Windows em inglês)
 
-Abra PowerShell como Administrador.
+Repita os passos abaixo duas vezes: uma para a porta `80` e outra para a porta `443`.
+
+1. Clique em **Start**, digite `Windows Defender Firewall with Advanced Security` e abra.
+2. No menu da esquerda, clique em **Inbound Rules**.
+3. No menu da direita, clique em **New Rule...**
+4. Em *Rule Type*, marque **Port** e clique em **Next**.
+5. Marque **TCP**. Marque **Specific local ports** e digite `80` (na segunda vez, `443`). Clique em **Next**.
+6. Em *Action*, marque **Allow the connection** e clique em **Next**.
+7. Em *Profile*, deixe **Domain**, **Private** e **Public** marcados e clique em **Next**.
+8. Em *Name*, digite `Nginx HTTP` (na segunda vez, `Nginx HTTPS`) e clique em **Finish**.
+
+A regra aparece na lista de **Inbound Rules** com um ícone verde. Se aparecer, está liberada.
+
+## 1.3 No Windows Firewall — pelo PowerShell (mais rápido)
+
+Se preferir, faça o mesmo pelo comando. Abra PowerShell como Administrador.
 
 Não coloque `C:\Windows\System32>` antes do comando.
 
