@@ -139,6 +139,7 @@ module.exports = async (conn, mek, dataVendas) => {
         "vendedor.produtosVendidos":
           "📊 Digite a *quantidade de produtos vendidos pelo vendedor*:",
         imagem: "🖼️ Digite a *URL da imagem*:",
+        pagamento: "💳 Envie o *QR Code, link de pagamento ou texto* que o cliente deve usar para pagar. Pode ser uma imagem, link ou mensagem curta:",
       };
 
       // Iniciar objeto de edição
@@ -532,7 +533,6 @@ module.exports = async (conn, mek, dataVendas) => {
             "",
             "*⚙️ Configurações*",
             "/dominio [domínio] — mostra ou troca o domínio dos links",
-            "/lofypay <public key> <secret key> — troca as chaves do PIX",
             "/token <token> — troca o token (reinicia o bot)",
             "/bot <número> — troca o número do bot (reinicia o bot)",
             "/puxadas <link do grupo> — troca o grupo de puxadas",
@@ -713,31 +713,6 @@ module.exports = async (conn, mek, dataVendas) => {
           process.exit(0);
         }, 2000);
         break;
-
-      case "lofypay": {
-        const [publicKey, secretKey] = args;
-
-        if (!publicKey || !secretKey) {
-          return enviar(
-            "⚠️ Uso: /lofypay <public key> <secret key>\n\nExemplo:\n/lofypay pk_live_xxx sk_live_xxx",
-          );
-        }
-
-        if (!secretKey.startsWith("sk_")) {
-          return enviar(
-            "⚠️ A secret key deve começar com sk_live_ (ou sk_test_). Confira a ordem: public key primeiro, depois a secret.",
-          );
-        }
-
-        const cfgLofy = JSON.parse(fs.readFileSync("./config.json"));
-        cfgLofy.lofypay = { publicKey, secretKey };
-        fs.writeFileSync("./config.json", JSON.stringify(cfgLofy, null, 2));
-
-        enviar(
-          `✅ LofyPay atualizado!\n\nPublic: ${publicKey}\nSecret: ${secretKey.slice(0, 8)}...${secretKey.slice(-4)}\n\nJá vale para os próximos PIX, sem reiniciar.`,
-        );
-        break;
-      }
 
       case "dominio": {
         const atual = getDominio();
@@ -1043,6 +1018,7 @@ module.exports = async (conn, mek, dataVendas) => {
             produtosVendidos: 0,
           },
           imagem: [],
+          pagamento: "",
         };
         dataVendas.push(novoItem);
 

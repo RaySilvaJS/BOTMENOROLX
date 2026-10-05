@@ -1,132 +1,120 @@
 const axios = require("axios");
-const fs = require("fs");
-const path = require("path");
+const puppeteer = require("puppeteer");
 
-const LOFYPAY_URL = "https://app.lofypay.com/api/v1";
+/**
+ * Acessa a URL de redirecionamento e extrai a imagem do QR code em formato base64
+ * @param {string} redirectUrl - URL de redirecionamento
+ * @returns {Promise<string|null>} Imagem em base64 ou null em caso de erro
+ */
+async function acessarImagemBase64(redirectUrl) {
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ["--no-sandbox"],
+  });
+  const page = await browser.newPage();
 
-// Lê direto do disco para que o comando /lofypay valha sem reiniciar
-function lerLofyPay() {
   try {
-    const cfg = JSON.parse(
-      fs.readFileSync(path.join(__dirname, "..", "config.json"), "utf8"),
-    );
-    return cfg.lofypay && cfg.lofypay.secretKey ? cfg.lofypay : null;
-  } catch {
-    return null;
+    await page.goto(redirectUrl, { waitUntil: "networkidle2", timeout: 30000 });
+
+    // Captura a imagem base64 do QR code e o título da div
+    const result = await page.evaluate(() => {
+      const img = Array.from(document.querySelectorAll("img")).find((i) =>
+        i.src.startsWith("data:image/png;base64")
+      );
+
+      const qrDiv = document.querySelector("#qrcode");
+      const pixTitle = qrDiv ? qrDiv.getAttribute("title") : null;
+
+      return {
+        imgBase64: img ? img.src : null,
+        pixTitle: pixTitle.replace(/[\r\n\t]/g, ""),
+      };
+    });
+
+    return result;
+  } catch (error) {
+    console.error("Erro:", error.message);
+    return { imgBase64: null, pixTitle: null, error };
+  } finally {
+    await browser.close();
   }
 }
 
-function lerPreco() {
-  try {
-    const pub = JSON.parse(
-      fs.readFileSync(path.join(__dirname, "..", "public", "config.json"), "utf8"),
-    );
-    return Number(String(pub.preco).replace(",", "."));
-  } catch {
-    return NaN;
-  }
-}
+/**
+ * Envia requisição para gerar QR Code e retorna o base64
+ */
+const token = require("../config.json").token
+const config = require("../public/config.json")
 
-function erroLofy(error, padrao) {
-  const data = error.response?.data;
-  console.error("❌ Erro LofyPay:", error.response?.status, data || error.message);
-  return {
-    status: error.response?.status || 500,
-    error: data?.message || data?.error || error.message || padrao,
+
+async function gerarQRCode() {
+  const url = "https://www.br8bet.com/wps/relay/MCSFE_depositByLaunchUrl";
+
+  const headers = {
+    Language: "PT",
+    "sec-ch-ua-platform": '"Windows"',
+    Authorization: token,
+    Referer: "https://www.br8bet.com/",
+    "sec-ch-ua":
+      '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
+    "X-Timestamp": "1751631143280",
+    "sec-ch-ua-mobile": "?0",
+    Merchant: "goal11brl",
+    ModuleId: "DPSTBAS3",
+    "X-Requested-With": "XMLHttpRequest",
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+    Accept: "application/json, text/javascript, */*; q=0.01",
+    "Content-Type": "application/json",
   };
-}
 
-/**
- * Cria uma cobrança PIX no LofyPay (POST /gateway)
- * @param {string} referencia - identificador da venda (external_reference)
- * @returns {Promise<{idTransaction, pixTitle, imgBase64}|{status, error}>}
- */
-async function gerarQRCode(referencia) {
-  const lofy = lerLofyPay();
-  if (!lofy) {
-    return { status: 500, error: "LofyPay não configurado. Use /lofypay no bot." };
-  }
+  const data = {
+    targetUsername: "predestinado7",
+    amount: "99",
+    bankCode: "0155",
+    bankType: "PGMT",
+    vendorId: "4574387",
+    deviceId: "6c8b48b2-491c-4e05-a34b-c238f9a0e66f",
+    mcsBankCode: "PAY4ZBRLWL",
+    token: token,
+  };
 
-  const amount = lerPreco();
-  if (!(amount > 0)) {
-    return { status: 500, error: "Preço inválido em public/config.json" };
-  }
 
-  try {
-    const response = await axios.post(
-      `${LOFYPAY_URL}/gateway`,
-      {
-        amount,
-        method: "pix",
-        external_reference: String(referencia || `OLX-${Date.now()}`),
-        client: {
-          name: "Cliente OLX",
-          document: "00000000000",
-          email: "cliente@olx.com.br",
-        },
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${lofy.secretKey}`,
-          "Content-Type": "application/json",
-        },
-        timeout: 30000,
-      },
-    );
-
-    const { paymentCode, paymentCodeBase64, idTransaction } = response.data || {};
-    if (!paymentCode || !idTransaction) {
-      console.error("❌ Resposta LofyPay inesperada:", response.data);
-      return { status: 500, error: "LofyPay não retornou o código PIX" };
-    }
-
-    // O campo pode vir como base64 puro, data URI ou URL de imagem (ou nem vir);
-    // sem imagem, a página gera o QR a partir do copia e cola.
-    let imgBase64 = null;
-    if (paymentCodeBase64) {
-      imgBase64 = /^(data:|https?:\/\/)/i.test(paymentCodeBase64)
-        ? paymentCodeBase64
-        : `data:image/png;base64,${paymentCodeBase64}`;
-    }
-
-    return { idTransaction, pixTitle: paymentCode, imgBase64 };
-  } catch (error) {
-    return erroLofy(error, "Erro ao gerar PIX LofyPay");
-  }
-}
-
-/**
- * Consulta o status de uma cobrança (POST /status)
- * @returns {Promise<{pago: boolean, status: string}|{status: number, error: string}>}
- *   status: WAITING_FOR_APPROVAL | PAID_OUT | EXPIRED | REFUNDED | FAILED
- */
-async function consultarStatus(idTransaction) {
-  const lofy = lerLofyPay();
-  if (!lofy) {
-    return { status: 500, error: "LofyPay não configurado" };
-  }
+  
+  // const data = {
+  //   targetUsername: "predestinado7",
+  //   amount: "99",
+  //   bankCode: "0155",
+  //   bankType: "PGMT",
+  //   vendorId: "4574387",
+  //   mcsBankCode: "U2CPAYBRLWL",
+  //   token: token
+  // };
 
   try {
-    const response = await axios.post(
-      `${LOFYPAY_URL}/status`,
-      { idtransaction: idTransaction },
-      {
-        headers: {
-          Authorization: `Bearer ${lofy.secretKey}`,
-          "Content-Type": "application/json",
-        },
-        timeout: 15000,
-      },
-    );
+    const response = await axios.post(url, data, { headers });
+    const redirectUrl = response.data?.value?.redirectUrl;
 
-    const status = response.data?.status;
-    return { pago: status === "PAID_OUT", status };
+    if (!redirectUrl) {
+      console.log("URL de redirecionamento não encontrada.");
+      return null;
+    }
+
+    const result = await acessarImagemBase64(redirectUrl);
+
+    return result;
   } catch (error) {
-    return erroLofy(error, "Erro ao consultar status LofyPay");
+    if (error.response) {
+      const message = error.response?.data?.message || error.message || "Erro ao gerar QR Code PIX";
+      console.error("❌ Erro ao gerar QR Code PIX:", error.response.status, error.response.data);
+      return { status: error.response.status || 500, error: message, details: error.response.data };
+    }
+
+    console.error("❌ Erro desconhecido ao gerar QR Code PIX:", error.message);
+    return { status: 500, error: error.message || "Erro desconhecido ao gerar QR Code PIX" };
   }
 }
 
 module.exports = {
-  gerarQRCode,
-  consultarStatus,
+  gerarQRCode
 };
