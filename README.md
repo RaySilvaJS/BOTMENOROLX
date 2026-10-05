@@ -23,10 +23,11 @@ Instale nesta ordem:
 | 2 | Node.js (LTS) | Executa o servidor/bot na porta `3000` | https://nodejs.org/en/download |
 | 3 | Nginx | Reverse Proxy HTTP/HTTPS | https://nginx.org/download/nginx-1.28.0.zip (outras versões: https://nginx.org/en/download.html) |
 | 4 | Conta Cloudflare | DNS e Proxy (não há instalador, é pelo site) | https://dash.cloudflare.com/sign-up |
-| 5 | Win-ACME (`wacs.exe`) | Gera o certificado Let's Encrypt | https://github.com/win-acme/win-acme/releases/latest (baixe o `win-acme.vX.X.X.x64.pluggable.zip`) |
+| 5 | Win-ACME (`wacs.exe`) | Gera o certificado Let's Encrypt | https://github.com/win-acme/win-acme/releases/download/v2.2.9.1701/win-acme.v2.2.9.1701.x64.pluggable.zip |
 
 Observações:
 
+* O `config.json` não vai para o GitHub (tem tokens). Depois de clonar, copie `config.example.json` para `config.json` e preencha `token` e as chaves do `lofypay`.
 * O Puppeteer baixa o Chromium sozinho durante o `npm install`.
 * Após instalar Git e Node.js, feche e abra o PowerShell novamente para o PATH ser atualizado.
 * O Nginx e o Win-ACME não têm instalador: basta extrair o `.zip` (veja a estrutura abaixo).
@@ -438,7 +439,7 @@ Se der timeout, verifique:
 
 # 13. Instalar Win-ACME
 
-Baixe o Win-ACME: https://github.com/win-acme/win-acme/releases/latest (arquivo `win-acme.vX.X.X.x64.pluggable.zip`) e extraia o `.zip`.
+Baixe o Win-ACME: https://github.com/win-acme/win-acme/releases/download/v2.2.9.1701/win-acme.v2.2.9.1701.x64.pluggable.zip e extraia o `.zip`.
 
 Execute o Win-ACME (`wacs.exe`) como administrador.
 
