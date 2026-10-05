@@ -13,6 +13,26 @@ Este guia configura um site Node.js em uma VPS Windows usando:
 
 ---
 
+# 0. Componentes e downloads (Windows) — ordem de instalação
+
+Instale nesta ordem:
+
+| Ordem | Componente | Para que serve | Download (Windows) |
+| :---: | --- | --- | --- |
+| 1 | Git for Windows | Fornece o `sh` usado pelo `npm start` e permite clonar o projeto | https://git-scm.com/download/win |
+| 2 | Node.js (LTS) | Executa o servidor/bot na porta `3000` | https://nodejs.org/en/download |
+| 3 | Nginx | Reverse Proxy HTTP/HTTPS | https://nginx.org/download/nginx-1.28.0.zip (outras versões: https://nginx.org/en/download.html) |
+| 4 | Conta Cloudflare | DNS e Proxy (não há instalador, é pelo site) | https://dash.cloudflare.com/sign-up |
+| 5 | Win-ACME (`wacs.exe`) | Gera o certificado Let's Encrypt | https://github.com/win-acme/win-acme/releases/latest (baixe o `win-acme.vX.X.X.x64.pluggable.zip`) |
+
+Observações:
+
+* O Puppeteer baixa o Chromium sozinho durante o `npm install`.
+* Após instalar Git e Node.js, feche e abra o PowerShell novamente para o PATH ser atualizado.
+* O Nginx e o Win-ACME não têm instalador: basta extrair o `.zip` (veja a estrutura abaixo).
+
+---
+
 # 1. Estrutura utilizada
 
 Exemplo:
@@ -60,7 +80,7 @@ localhost:3000
 
 # 2. Instalar Node.js
 
-Instale o Node.js na VPS.
+Instale o Git for Windows (https://git-scm.com/download/win) e depois o Node.js LTS (https://nodejs.org/en/download) na VPS.
 
 Depois confirme:
 
@@ -104,7 +124,9 @@ O site precisa funcionar antes de configurar o Nginx.
 
 # 3. Instalar / colocar o Nginx
 
-Exemplo:
+Baixe o Nginx para Windows: https://nginx.org/download/nginx-1.28.0.zip
+
+Extraia o `.zip` em:
 
 ```text
 C:\Users\Administrator\Desktop\nginx-1.28.0
@@ -323,7 +345,7 @@ Antes do Cloudflare, deverá aparecer o IP da VPS.
 
 # 10. Configurar Cloudflare
 
-Adicione o domínio ao Cloudflare.
+Crie a conta em https://dash.cloudflare.com/sign-up e adicione o domínio ao Cloudflare.
 
 O Cloudflare fornecerá dois nameservers.
 
@@ -415,6 +437,8 @@ Se der timeout, verifique:
 ---
 
 # 13. Instalar Win-ACME
+
+Baixe o Win-ACME: https://github.com/win-acme/win-acme/releases/latest (arquivo `win-acme.vX.X.X.x64.pluggable.zip`) e extraia o `.zip`.
 
 Execute o Win-ACME (`wacs.exe`) como administrador.
 
