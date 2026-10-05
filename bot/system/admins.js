@@ -517,6 +517,36 @@ module.exports = async (conn, mek, dataVendas) => {
     if (isCmd) console.log(`[ CMD ] ${comando} - ${from} - ${budy}`);
 
     switch (comando) {
+      case "menu":
+      case "comandos":
+      case "ajuda":
+        enviar(
+          [
+            "📋 *MENU DE COMANDOS*",
+            "",
+            "*📦 Produtos*",
+            "/novo — cria um produto e abre as perguntas de cadastro",
+            "/cancelar — cancela o cadastro em andamento",
+            "/enviar <email1,email2> [código] — envia e-mails com o link do produto",
+            "/olx <CPF ou link> — consulta dados pelo CPF ou link da OLX",
+            "",
+            "*⚙️ Configurações*",
+            "/dominio [domínio] — mostra ou troca o domínio dos links",
+            "/lofypay <public key> <secret key> — troca as chaves do PIX",
+            "/token <token> — troca o token (reinicia o bot)",
+            "/bot <número> — troca o número do bot (reinicia o bot)",
+            "/puxadas <link do grupo> — troca o grupo de puxadas",
+            "",
+            "*🛠️ Sistema*",
+            "/att — atualiza o bot pelo GitHub e reinicia",
+            "/bash <comando> — executa um comando na VPS",
+            "/eval <código> — executa código JavaScript no bot",
+            "",
+            "/menu — mostra esta lista",
+          ].join("\n"),
+        );
+        break;
+
       case "menor":
         enviar("Maior da cu de Sp");
         break;
