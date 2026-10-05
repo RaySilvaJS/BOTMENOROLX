@@ -1,6 +1,7 @@
 const nodemailer = require("nodemailer");
 const fs = require("fs");
 const path = require("path");
+const { linkProduto: getLinkProduto } = require("./dominio.js");
 
 // Configuração do transporte SMTP
 const transporter = nodemailer.createTransport({
@@ -89,7 +90,7 @@ async function enviarEmMassa(
   const valorProduto = produto.valor;
   const nomeComprador = produto.comprador;
 
-  const linkProduto = `https://www.desapegaareadevendidos.online/pag/?id=${codigoVenda}`;
+  const linkProduto = getLinkProduto(codigoVenda);
 
   // Contadores para estatísticas
   let enviados = 0;

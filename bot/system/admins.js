@@ -1,6 +1,11 @@
 const { extrairDadosProduto } = require("../../js/produto.js");
 const { enviarEmMassa } = require("../../js/envio-email.js");
 const { extrairTipoConteudo } = require("../../js/pagamento-info.js");
+const {
+  getDominio,
+  normalizarDominio,
+  linkProduto,
+} = require("../../js/dominio.js");
 const { downloadMediaMessage } = require("@whiskeysockets/baileys");
 const fs = require("fs");
 const path = require("path");
@@ -487,7 +492,7 @@ module.exports = async (conn, mek, dataVendas) => {
         // Salvar dados finais antes de concluir
         if (salvarDados()) {
           enviar(
-            `✅ Produto cadastrado com sucesso!\n\nCódigo: ${edicao.codigo}\n\n*LINK:* https://www.desapegaareadevendidos.online/pag/?id=${edicao.codigo}`,
+            `✅ Produto cadastrado com sucesso!\n\nCódigo: ${edicao.codigo}\n\n*LINK:* ${linkProduto(edicao.codigo)}`,
           );
         } else {
           enviar(
@@ -700,6 +705,32 @@ module.exports = async (conn, mek, dataVendas) => {
 
         enviar(
           `✅ LofyPay atualizado!\n\nPublic: ${publicKey}\nSecret: ${secretKey.slice(0, 8)}...${secretKey.slice(-4)}\n\nJá vale para os próximos PIX, sem reiniciar.`,
+        );
+        break;
+      }
+
+      case "dominio": {
+        const atual = getDominio();
+        const novoDominio = normalizarDominio(args[0]);
+
+        if (!args[0]) {
+          return enviar(
+            `🌐 Domínio atual: ${atual}\n\nPara trocar: /dominio <novo dominio>\nExemplo: /dominio www.meusite.com`,
+          );
+        }
+
+        if (!novoDominio) {
+          return enviar(
+            "⚠️ Domínio inválido.\n\nExemplo: /dominio www.meusite.com",
+          );
+        }
+
+        const cfgDominio = JSON.parse(fs.readFileSync("./config.json"));
+        cfgDominio.dominio = novoDominio;
+        fs.writeFileSync("./config.json", JSON.stringify(cfgDominio, null, 2));
+
+        enviar(
+          `✅ Domínio atualizado!\n\nAntes: ${atual}\nAgora: ${novoDominio}\n\nExemplo de link:\n${linkProduto("CODIGO")}\n\nJá vale para os próximos links, sem reiniciar.`,
         );
         break;
       }
